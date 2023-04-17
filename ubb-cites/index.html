@@ -1,0 +1,480 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <script src="//d3js.org/d3.v3.min.js"></script>
+
+    <style>
+      .card-container {
+        margin: 10px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+      }
+
+      input[type="text"] {
+        padding: 5px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      li {
+        padding: 5px;
+        margin-bottom: 5px;
+        border-radius: 5px;
+        background-color: #f2f2f2;
+      }
+
+      .highlight {
+        background-color: yellow;
+        display: none;
+      }
+
+      .list-parrent {
+        height: 10vh;
+        overflow: auto;
+      }
+
+      .canvas {
+        width: 90vw;
+        height: 80vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card-container">
+        <input type="text" id="search-input" placeholder="Search..." />
+        <div class="list-parrent">
+          <ul id="list"></ul>
+        </div>
+      </div>
+      <div class="card-container">
+        selected name: <span id="selected-name"></span>
+        <br />
+        selected id: <span id="selected-id"></span>
+        <br />
+        selected ncit: <span id="selected-ncit"></span>
+        <br />
+        selected group: <span id="selected-group"></span>
+        <br />
+        <button id="deselect-btn">Deselect</button>
+      </div>
+      <div class="card-container">
+        <input type="checkbox" id="show-names-checkbox" />
+        <label for="show-names-checkbox">Show names</label>
+      </div>
+      <div class="card-container">
+        <!-- switch (d.Group) {
+          case "Engineering":
+            return "#ff0000";
+          case "Social Science":
+            return "#0000ff";
+          case "Mathematics and Computer Science":
+            return "#00ff00";
+          case "Natural Science":
+            return "#baba32";
+          case "Life Science":
+            return "#ff00ff";
+          case "Liberal Arts":
+            return "#00ffff";
+          default:
+            return "#000000";
+        } -->
+        <!-- display the colors with a checkbox -->
+
+        <input checked type="checkbox" id="show-engineering-checkbox" />
+        <label style="color: #ff0000" for="show-engineering-checkbox"
+          >Engineering</label
+        >
+        <br />
+
+        <input checked type="checkbox" id="show-social-science-checkbox" />
+        <label style="color: #0000ff" for="show-social-science-checkbox"
+          >Social Science</label
+        >
+        <br />
+
+        <input
+          checked
+          type="checkbox"
+          id="show-mathematics-and-computer-science-checkbox"
+        />
+        <label
+          style="color: #00ff00"
+          for="show-mathematics-and-computer-science-checkbox"
+          >Mathematics and Computer Science</label
+        >
+        <br />
+
+        <input checked type="checkbox" id="show-natural-science-checkbox" />
+        <label style="color: #baba32" for="show-natural-science-checkbox"
+          >Natural Science</label
+        >
+        <br />
+
+        <input checked type="checkbox" id="show-life-science-checkbox" />
+        <label style="color: #ff00ff" for="show-life-science-checkbox"
+          >Life Science</label
+        >
+        <br />
+
+        <input checked type="checkbox" id="liberal-arts" />
+        <label style="color: #00ffff" for="liberal-artsx">Liberal Arts</label>
+      </div>
+    </div>
+    <div class="canvas"></div>
+  </body>
+
+  <script src="./nodes.js"></script>
+  <script src="./edges.js"></script>
+
+  <script>
+    // const nodes = nodesData.filter((node) => node.weight > 1);
+    nodesData = nodesData.map((node) => {
+      return {
+        ...node,
+        weight: (node.weight + 1) * 3,
+        id: Number(node.id),
+      };
+    });
+
+    let nodes = nodesData;
+
+    let selectedNode;
+
+    edgesData = edgesData.map((edge) => {
+      return {
+        ...edge,
+        weight: (edge.weight + 1) * 2,
+        source: Number(edge.source - 1),
+        target: Number(edge.target - 1),
+      };
+    });
+
+    let edges = edgesData;
+
+    // Set the dimensions of the SVG container
+    // var width = window.innerWidth * 0.9;
+    // const height = window.innerHeight * 0.8;
+
+    let mode = "drag";
+
+    // Create an SVG container
+    var svg = d3
+      .select(".canvas")
+      .append("svg")
+      .call(
+        d3.behavior.zoom().on("zoom", function () {
+          if (mode === "drag") {
+            svg.attr(
+              "transform",
+              "translate(" +
+                d3.event.translate +
+                // [0, 0] +
+                ")" +
+                " scale(" +
+                d3.event.scale +
+                ")"
+            );
+          }
+        })
+      )
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .append("g");
+
+    // build the searchable list
+    var list = d3.select("#list");
+    var listItems = list
+      .selectAll("li")
+      .data(nodes)
+      .enter()
+      .append("li")
+      .text(function (d) {
+        return d.Name;
+      });
+
+    const canvas = document.querySelector(".canvas");
+
+    // Create the force layout
+    var force = d3.layout
+      .force()
+      .nodes(nodes)
+      .links(edges)
+      .size([canvas.clientWidth, canvas.clientHeight])
+      .linkDistance(10)
+      .charge(-200);
+
+    // Create the links
+    var link = svg
+      .selectAll(".link")
+      .data(edges)
+      .enter()
+      .append("line")
+      .attr("class", "link")
+      .style("stroke", "#999")
+      .style("stroke-opacity", 0.6);
+
+    for (const n of link[0]) {
+      n.style.strokeWidth = n.__data__.weight * 2;
+    }
+
+    var tooltip = d3
+      .select("body")
+      .append("div")
+      .attr("class", "tooltip")
+      .style("position", "absolute")
+      .style("z-index", "10")
+      .style("visibility", "hidden");
+
+    // Create the nodes
+    var node = svg
+      .selectAll(".node")
+      .data(nodes)
+      .enter()
+      .append("circle")
+      .attr("class", "node")
+      .on("mouseover", function (d) {
+        tooltip
+          .html("ID: " + d.id + "<br>Name: " + d.Name + "<br>Ncit: " + d.Ncit)
+          .style("visibility", "visible")
+          .style("top", d3.event.pageY - 10 + "px")
+          .style("left", d3.event.pageX + 10 + "px");
+      })
+      .on("mouseleave", function (d) {
+        tooltip.style("visibility", "hidden");
+      })
+      .on("mousedown", function (d) {
+        mode = "select";
+        console.log("enter");
+      })
+      .on("mouseup", function (d) {
+        console.log("leave");
+        mode = "drag";
+      })
+      .style("stroke", "#000")
+      .call(force.drag);
+
+    for (const n of node[0]) {
+      n.r.baseVal.value = n.__data__.weight;
+      switch (n.__data__.Group) {
+        case "Engineering":
+          n.style.fill = "#ff0000";
+          break;
+        case "Social Science":
+          n.style.fill = "#0000ff";
+          break;
+        case "Mathematics and Computer Science":
+          n.style.fill = "#00ff00";
+          break;
+        case "Natural Science":
+          n.style.fill = "#baba32";
+          break;
+        case "Life Science":
+          n.style.fill = "#ff00ff";
+          break;
+        case "Liberal Arts":
+          n.style.fill = "#00ffff";
+          break;
+        default:
+          n.style.fill = "#000000";
+          break;
+      }
+    }
+
+    // Create the labels for the nodes
+    var label = svg
+      .selectAll(".label")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .attr("class", "label")
+      .attr("text-anchor", "middle")
+      .style("display", "none");
+
+    for (const l of label[0]) {
+      l.dy = l.__data__.weight;
+      l.textContent = l.__data__.Name;
+    }
+
+    // Start the force layout
+    force.on("tick", function () {
+      link
+        .attr("x1", function (d) {
+          return d.source.x;
+        })
+        .attr("y1", function (d) {
+          return d.source.y;
+        })
+        .attr("x2", function (d) {
+          return d.target.x;
+        })
+        .attr("y2", function (d) {
+          return d.target.y;
+        });
+
+      node
+        .attr("cx", function (d) {
+          return d.x;
+        })
+        .attr("cy", function (d) {
+          return d.y;
+        });
+
+      label
+        .attr("x", function (d) {
+          return d.x;
+        })
+        .attr("y", function (d) {
+          return d.y + d.weight * 2 + 15;
+        });
+    });
+
+    // Function to handle search bar input
+    function handleInput(searchTerm) {
+      //   var searchTerm = d3.select("#search-bar").property("value").toLowerCase();
+
+      // set searchTerm to the value of the input
+      //   var searchTerm = searchInput.value.toLowerCase();
+
+      // node.style("opacity", function (d) {
+      //   if (d.Name.toLowerCase().indexOf(searchTerm) >= 0) {
+      //     return 1;
+      //   } else {
+      //     return 0.2;
+      //   }
+      // });
+
+      // link.style("opacity", function (d) {
+      //   if (
+      //     d.source.Name.toLowerCase().indexOf(searchTerm) >= 0 ||
+      //     d.target.Name.toLowerCase().indexOf(searchTerm) >= 0
+      //   ) {
+      //     return 1;
+      //   } else {
+      //     return 0.2;
+      //   }
+      // });
+
+      for (const n of node[0]) {
+        if (n.__data__.Name.toLowerCase().indexOf(searchTerm) >= 0) {
+          n.style.opacity = 1;
+        } else {
+          n.style.opacity = 0.2;
+        }
+      }
+    }
+
+    const selectedNameTag = d3.select("#selected-name");
+    const selectedId = d3.select("#selected-id");
+    const selectedNcit = d3.select("#selected-ncit");
+    const selectedGroup = d3.select("#selected-group");
+
+    const deselectButton = d3.select("#deselect-btn");
+
+    deselectButton.on("click", function () {
+      selectedNode = null;
+      deselectButton.style("display", "none");
+      selectedNameTag.text(" ");
+      selectedId.text(" ");
+      selectedNcit.text(" ");
+      selectedGroup.text(" ");
+      node.style("opacity", 1);
+      link.style("opacity", 1);
+    });
+
+    deselectButton.style("display", "none");
+
+    listItems.on("click", function (d) {
+      selectedNode = d;
+
+      selectedNameTag.text(d.Name);
+      selectedId.text(d.id);
+      selectedNcit.text(d.Ncit);
+      selectedGroup.text(d.Group);
+
+      deselectButton.style("display", "block");
+
+      handleInput(d.Name.toLowerCase());
+    });
+
+    // Event listener for search bar input
+    // d3.select("#search-bar").on("input", handleInput);
+
+    var searchInput = document.getElementById("search-input");
+    var list = document.getElementById("list");
+    var listItems = list.getElementsByTagName("li");
+
+    searchInput.addEventListener("keyup", function () {
+      var filter = searchInput.value.toLowerCase();
+
+      for (var i = 0; i < listItems.length; i++) {
+        var listItem = listItems[i];
+        var text = listItem.innerText.toLowerCase();
+
+        if (text.indexOf(filter) > -1) {
+          listItem.classList.remove("highlight");
+        } else {
+          listItem.classList.add("highlight");
+        }
+      }
+    });
+
+    d3.select("#show-names-checkbox").on("change", function () {
+      if (this.checked) {
+        label.style("display", "block");
+      } else {
+        label.style("display", "none");
+      }
+    });
+
+    const showEngineeringCheckbox = d3.select("#show-engineering-checkbox");
+    const showSocialScienceCheckbox = d3.select(
+      "#show-social-science-checkbox"
+    );
+    const showMathematicsCheckbox = d3.select("#show-mathematics-checkbox");
+    const showNaturalScienceCheckbox = d3.select(
+      "#show-natural-science-checkbox"
+    );
+    const showLifeScienceCheckbox = d3.select("#show-life-science-checkbox");
+    const showLiberalArts = d3.select("#liberal-arts");
+
+    showEngineeringCheckbox.on("change", function () {
+      console.log("Engineering checkbox changed");
+
+      if (this.checked) {
+        nodes = nodes.filter((n) => n.Group !== "Engineering");
+        edges = edges.filter(
+          (e) =>
+            e.source.Group !== "Engineering" && e.target.Group !== "Engineering"
+        );
+      } else {
+        nodes = nodesData;
+        edges = edgesData;
+      }
+
+      force.nodes(nodes);
+      node.data(nodes);
+      // label.data(nodes);
+      link.data(edges);
+    });
+
+    force.start();
+  </script>
+</html>
